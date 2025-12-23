@@ -1,4 +1,4 @@
-# Multimodal-RAG-for-Chat-App
+# Multimodal RAG for Chat App
 
 ## Table of contents
 
