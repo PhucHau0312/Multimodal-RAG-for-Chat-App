@@ -63,7 +63,7 @@ def calculate_retrieval_scores(result_data):
 
     for data in result_data:
         results[str(data["q_id"])] = {str(id): float(score) for id, score in zip(data["retrieved_ids"], data["scores"])}
-        formatted_qrels[str(data["q_id"])] = {id: 1.0 for id in data["retrieved_ids"]}
+        formatted_qrels[str(data["q_id"])] = {id: 1.0 for id in data["gt_ids"]}
 
     return {
         "ndcg@5", ndcg_at_k(formatted_qrels, results, k=5),
