@@ -32,18 +32,27 @@ if __name__ == "__main__":
         try:
             response = rag_for_single_query(eval(row["question"], str))
 
-            retrieved_ids = [f"{con.get("image").get("doc_id")}_{con.get("image").get("page_num")}" 
+            visual_retrieved_ids = [f"{con.get("image").get("doc_id")}_{con.get("image").get("page_num")}" 
                             for con in response["visual_context"]]
-            scores = [con.get("score") for con in response["visual_context"]]
+            visual_scores = [con.get("score") for con in response["visual_context"]]
+
+            textual_retrieved_ids = [f"{con.get("text").get("doc_id")}_{con.get("text").get("page_num")}" 
+                            for con in response["textual_context"]]
+            textual_scores = [con.get("score") for con in response["textual_context"]]
 
             results.append({
                 "q_id": q_id,
                 "question": row["question"], 
-                "answer": response["answer"],
                 "gt_answer": row["answer"],
-                "retrieved_ids": retrieved_ids,
                 "gt_ids": gt_ids, 
-                "scores": scores
+                "final_answer": response["answer"],
+                "visual_response_dict": response["visual_response_dict"],
+                "textual_response_dict": response["textual_response_dict"],
+                "visual_retrieved_ids": visual_retrieved_ids,
+                "textual_retrieved_ids": textual_retrieved_ids,
+                "visual_scores": visual_scores,
+                "textual_scores": textual_scores
+
             })
         except Exception as e:
             print(f"Error answering for query {q_id}: {str(e)}")

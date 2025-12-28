@@ -9,9 +9,11 @@ from collections import Counter
 
 from vidore_benchmark.evaluation.metrics import mrr, recall_at_k, ndcg_at_k
 
-from deepeval.metrics.g_eval import GEval
-from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from deepeval import evaluate
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+
+from deepeval.metrics.g_eval import GEval
+from deepeval.metrics import FaithfulnessMetric, AnswerRelevancyMetric
 
 
 def normalize_answer(s):
@@ -58,66 +60,159 @@ def calculate_f1(prediction: List[str], ground_truth: List[str]) -> float:
 
 
 def calculate_retrieval_scores(result_data):
-    results = {}
-    formatted_qrels = {}
+    formatted_qrels  = {}
+    visual_results, textual_results  = {}, {}
 
     for data in result_data:
-        results[str(data["q_id"])] = {str(id): float(score) for id, score in zip(data["retrieved_ids"], data["scores"])}
         formatted_qrels[str(data["q_id"])] = {id: 1.0 for id in data["gt_ids"]}
 
-    return {
-        "ndcg@5", ndcg_at_k(formatted_qrels, results, k=5),
-        "recall@5", recall_at_k(formatted_qrels, results, k=5),
-        "mrr@10", mrr(formatted_qrels, results, k=10)
+        visual_results[str(data["q_id"])] = {str(id): float(score) for id, score in zip(data["visual_retrieved_ids"], data["visual_scores"])}
+        textual_results[str(data["q_id"])] = {str(id): float(score) for id, score in zip(data["textual_retrieved_ids"], data["textual_scores"])}
+
+    visual_eval_results = {
+        "ndcg@5": ndcg_at_k(formatted_qrels, visual_results, k=5),
+        "recall@5": recall_at_k(formatted_qrels, visual_results, k=5),
+        "mrr@10": mrr(formatted_qrels, visual_results, k=10)
+    }
+    textual_eval_results = {
+        "ndcg@5": ndcg_at_k(formatted_qrels, textual_results, k=5),
+        "recall@5": recall_at_k(formatted_qrels, textual_results, k=5),
+        "mrr@10": mrr(formatted_qrels, textual_results, k=10)
     }
 
+    return {"visual": visual_eval_results,
+            "textual": textual_eval_results}
 
-def calculate_generation_scores(result_data):
+
+def calculate_answering_scores(result_data):
     correctness_metric = GEval(
         name="Correctness",
         criteria="Determine if the 'actual output' is factually correct based on the 'expected output' (ground truth).",
         evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
         threshold=0.8
     )
+    answer_relevancy_metric = AnswerRelevancyMetric(threshold=0.7)
 
-    test_cases = []
-    f1_scores = []
+    visual_test_cases, textual_test_cases, final_test_cases = [], [], []
+    visual_f1_scores, textual_f1_scores, final_f1_scores = [], [], []
     for i, data in enumerate(result_data):
+        visual_answer = data["visual_response_dict"].get("Answer")
+        textual_answer = data["textual_response_dict"].get("Answer")
         answer, gt_answer = data["answer"], data["gt_answer"]
 
-        if answer and gt_answer:
+        if visual_answer:
             test_case = LLMTestCase(
                 input=data['question'],          
                 actual_output=answer,    
                 expected_output=gt_answer   
             )
-            test_cases.append(test_case)
+            visual_test_cases.append(test_case)
+            visual_f1_scores.append(calculate_f1(word_tokenize(answer), word_tokenize(gt_answer)))
 
-            predicted_tokens = word_tokenize(answer)
-            ground_truth_tokens = word_tokenize(gt_answer)
-            f1_scores.append(calculate_f1(predicted_tokens, ground_truth_tokens))
+        if textual_answer:
+            test_case = LLMTestCase(
+                input=data['question'],          
+                actual_output=answer,    
+                expected_output=gt_answer   
+            )
+            textual_test_cases.append(test_case)
+            textual_f1_scores.append(calculate_f1(word_tokenize(answer), word_tokenize(gt_answer)))
 
-    results = evaluate(test_cases, [correctness_metric], print_results=False)
+        if answer:
+            test_case = LLMTestCase(
+                input=data['question'],          
+                actual_output=answer,    
+                expected_output=gt_answer   
+            )
+            final_test_cases.append(test_case)
+            final_f1_scores.append(calculate_f1(word_tokenize(answer), word_tokenize(gt_answer)))
 
-    return {
+    visual_eval = evaluate(visual_test_cases, [correctness_metric, answer_relevancy_metric], print_results=False)
+    textual_eval = evaluate(textual_test_cases, [correctness_metric, answer_relevancy_metric], print_results=False)
+    final_eval = evaluate(final_test_cases, [correctness_metric, answer_relevancy_metric], print_results=False)
+        
+    visual_results =  {
         "correctness": {
-            "score": sum([res.metrics_metadata[0].score for res in results]) / len(results),
-            "success_rate": sum(1 for res in results if res.success) / len(results) * 100
+            "score": sum([res["metrics_results"][0]["score"] for res in visual_eval]) / len(visual_eval),
+            "success_rate": sum(1 for res in visual_eval if res["metrics_results"][0]["success"]) / len(visual_eval) * 100
         },
-        "f1": sum(f1_scores) / len(f1_scores)
+        "answer_relevancy": {
+            "score": sum([res["metrics_results"][1]["score"] for res in visual_eval]) / len(visual_eval),
+            "success_rate": sum(1 for res in visual_eval if res["metrics_results"][1]["success"]) / len(visual_eval) * 100
+        },
+        "f1": sum(visual_f1_scores) / len(visual_f1_scores)
+    }
+    textual_results =  {
+        "correctness": {
+            "score": sum([res["metrics_results"][0]["score"] for res in textual_eval]) / len(textual_eval),
+            "success_rate": sum(1 for res in textual_eval if res["metrics_results"][0]["success"]) / len(textual_eval) * 100
+        },
+        "answer_relevancy": {
+            "score": sum([res["metrics_results"][1]["score"] for res in textual_eval]) / len(textual_eval),
+            "success_rate": sum(1 for res in textual_eval if res["metrics_results"][1]["success"]) / len(textual_eval) * 100
+        },
+        "f1": sum(textual_f1_scores) / len(textual_f1_scores)
+    }
+    final_results =  {
+        "correctness": {
+            "score": sum([res["metrics_results"][0]["score"] for res in final_eval]) / len(final_eval),
+            "success_rate": sum(1 for res in final_eval if res["metrics_results"][0]["success"]) / len(final_eval) * 100
+        },
+        "answer_relevancy": {
+            "score": sum([res["metrics_results"][1]["score"] for res in final_eval]) / len(final_eval),
+            "success_rate": sum(1 for res in final_eval if res["metrics_results"][1]["success"]) / len(final_eval) * 100
+        },
+        "f1": sum(final_f1_scores) / len(final_f1_scores)
     }
 
+    return {"visual": visual_results,
+            "textual": textual_results, 
+            "final": final_results}
 
-def print_results(retrieval_results, generation_results):
+
+def print_results(retrieval_results, answering_results):
     print("Retrieval Evaluation:")
-    print("NDCG@5:", retrieval_results["ndcg@5"])
-    print("Recall@5:", retrieval_results["recall@5"])
-    print("MRR@10:", retrieval_results["mrr@10"])
+
+    print("Visual Retrieval:")
+    print("NDCG@5:", retrieval_results["visual"]["ndcg@5"])
+    print("Recall@5:", retrieval_results["visual"]["recall@5"])
+    print("MRR@10:", retrieval_results["visual"]["mrr@10"])
+    print("---------------------")
+    print("Textual Retrieval:")
+    print("NDCG@5:", retrieval_results["textual"]["ndcg@5"])
+    print("Recall@5:", retrieval_results["textual"]["recall@5"])
+    print("MRR@10:", retrieval_results["textual"]["mrr@10"])
     
+    print("---------------------\n---------------------")
+
     print("Generation Evaluation:")
-    print("Average Correctness Score:", generation_results["correctness"]["score"])
-    print("Success Rate:", generation_results["correctness"]["success_rate"])
-    print("F1 Score:", generation_results["f1"])
+
+    print("Visual Answering:")
+    print("Correctness:")
+    print("- Average Score:", answering_results["visual"]["correctness"]["score"])
+    print("- Success Rate:", answering_results["visual"]["correctness"]["success_rate"])
+    print("Answer Relevancy:")
+    print("- Average Score:", answering_results["visual"]["answer_relevancy"]["score"])
+    print("- Success Rate:", answering_results["visual"]["answer_relevancy"]["success_rate"])
+    print("F1 Score:", answering_results["visual"]["f1"])
+    print("---------------------")
+    print("Textual Answering:")
+    print("Correctness:")
+    print("- Average Score:", answering_results["textual"]["correctness"]["score"])
+    print("- Success Rate:", answering_results["textual"]["correctness"]["success_rate"])
+    print("Answer Relevancy:")
+    print("- Average Score:", answering_results["textual"]["answer_relevancy"]["score"])
+    print("- Success Rate:", answering_results["textual"]["answer_relevancy"]["success_rate"])
+    print("F1 Score:", answering_results["textual"]["f1"])
+    print("---------------------")
+    print("Final Answering:")
+    print("Correctness:")
+    print("- Average Score:", answering_results["final"]["correctness"]["score"])
+    print("- Success Rate:", answering_results["final"]["correctness"]["success_rate"])
+    print("Answer Relevancy:")
+    print("- Average Score:", answering_results["final"]["answer_relevancy"]["score"])
+    print("- Success Rate:", answering_results["final"]["answer_relevancy"]["success_rate"])
+    print("F1 Score:", answering_results["final"]["f1"])
 
 
 if __name__ == "__main__":
@@ -127,8 +222,8 @@ if __name__ == "__main__":
         data = json.load(f)
 
     retrieval_result = calculate_retrieval_scores(data)
-    generation_result = calculate_generation_scores(data)
+    answering_result = calculate_answering_scores(data)
     
-    print_results(retrieval_result, generation_result)
+    print_results(retrieval_result, answering_result)
 
     

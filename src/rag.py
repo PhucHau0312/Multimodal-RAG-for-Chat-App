@@ -112,6 +112,8 @@ def rag_for_single_query(query):
             "answer": final_response.get("Final Answer", ""),
             "analysis": final_response.get("Analysis", ""),
             "conclusion": final_response.get("Conclusion", ""),
+            "visual_response_dict": visual_response_dict,
+            "textual_response_dict": textual_response_dict,
             "visual_context": visual_contexts,
             "textual_context": textual_contexts
             }

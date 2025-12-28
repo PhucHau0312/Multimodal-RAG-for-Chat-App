@@ -17,3 +17,4 @@ pdf2image
 qdrant-client
 vidore-benchmark
 deepeval
+rapidocr-onnxruntime

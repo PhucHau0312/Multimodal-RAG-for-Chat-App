@@ -138,8 +138,16 @@ async def combine_responses(query, chat_history, visual_response, textual_respon
         textual_thought = textual_response.get('Chain of Thought', "CoT not available")
         textual_answer = textual_response['Answer']
         
-        prompt = combined_prompt.format(query, chat_history, visual_evidence, visual_thought, visual_answer, \
-                                        textual_evidence, textual_thought, textual_answer)
+        prompt = combined_prompt.format(
+            query=query,
+            chat_history=chat_history,
+            visual_evidence=visual_evidence,
+            visual_thought=visual_thought,
+            visual_answer=visual_answer,
+            textual_evidence=textual_evidence,
+            textual_thought=textual_thought,
+            textual_answer=textual_answer,
+        )
 
         messages = [
             {
@@ -199,8 +207,15 @@ async def combine_responses_for_single_query(query, visual_response, textual_res
         textual_thought = textual_response.get('Chain of Thought', "CoT not available")
         textual_answer = textual_response['Answer']
         
-        prompt = instruction_prompt.format(query, visual_evidence, visual_thought, visual_answer, \
-                                        textual_evidence, textual_thought, textual_answer)
+        prompt = instruction_prompt.format(
+            query=query,
+            visual_evidence=visual_evidence,
+            visual_thought=visual_thought,
+            visual_answer=visual_answer,
+            textual_evidence=textual_evidence,
+            textual_thought=textual_thought,
+            textual_answer=textual_answer,
+        )
 
         messages = [
             {
@@ -218,4 +233,3 @@ async def combine_responses_for_single_query(query, visual_response, textual_res
             "Conclusion": "Error occurred during conclusion.",
             "Final Answer": "Error occurred during combination of responses."
         }
-    
