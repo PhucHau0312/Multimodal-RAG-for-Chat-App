@@ -225,5 +225,3 @@ if __name__ == "__main__":
     answering_result = calculate_answering_scores(data)
     
     print_results(retrieval_result, answering_result)
-
-    
