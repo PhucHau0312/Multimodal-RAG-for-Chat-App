@@ -53,6 +53,52 @@ A multimodal retrieval-augmented pipeline specifically designed for visual docum
 - Response generation from each modality
 - Response combination for final answers
 
+## Evaluation
+
+Evaluation on **SciGraphQA** and **SlideVQA** dataset
+
+```tree
+Retrieval Evaluation:
+Visual Retrieval:
+NDCG@5: 0.9087453858698603
+Recall@5: 0.94
+MRR@5: 0.96
+---------------------
+Textual Retrieval:
+NDCG@5: 0.7133219069941542
+Recall@5: 0.75
+MRR@5: 0.8116666666666665
+---------------------
+---------------------
+Answering Evaluation:
+Visual Answering:
+Correctness:
+- Average Score: 0.3037534257193533
+- Success Rate: 34.0
+Answer Relevancy:
+- Average Score: 0.8958333333333334
+- Success Rate: 87.5
+F1 Score: 0.11087215583573543
+---------------------
+Textual Answering:
+Correctness:
+- Average Score: 0.25433611540952794
+- Success Rate: 28.57142857142857
+Answer Relevancy:
+- Average Score: 0.9172335600907029
+- Success Rate: 87.75510204081633
+F1 Score: 0.07889372416026859
+---------------------
+Final Answering:
+Correctness:
+- Average Score: 0.28365838987228686
+- Success Rate: 34.0
+Answer Relevancy:
+- Average Score: 0.894927536231884
+- Success Rate: 84.78260869565217
+F1 Score: 0.11090992003145306
+```
+
 ## Chat App UI
 
 ![pdf chat](./assets/pdf-chat-mode.png)
